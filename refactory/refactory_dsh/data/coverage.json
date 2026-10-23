@@ -1512,7 +1512,7 @@
         "panel": "Read help and project defaults button shows effective routing and provenance. RuntimeControls selects explicit overrides."
       },
       "purpose": "Inspect effective project worker routing and provenance. Configure refactory.workers.json, CLI or panel; this read-only action never changes workers or the CEO model.",
-      "reviewed_schema": "1266cac069beb590e7b5bd7861ed7d5f9dfc3c507ebb342c737186e7cffff9a9"
+      "reviewed_schema": "b14acef6de973e2c4e6244be0cc28031c2b5c7bdf892858f06ad94acc024dc8e"
     },
     "projects": {
       "chat": {
