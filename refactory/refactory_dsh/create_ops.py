@@ -2205,7 +2205,7 @@ MARKER_RULE = (
     "plain form: BLOCKING: <path>: <description>. Never wrap it in backticks, "
     "a code span, or quotation marks while explaining a check or describing "
     "the parser. When discussing the marker itself, call it \"the blocking "
-    "marker\"."
+    "marker\". Put any example of the format inside a fenced code block."
 )
 
 #: What the overwatch pass is told about its verdict, beside SEVERITY_RULE.

@@ -2127,11 +2127,17 @@ the quoted form.
 
 **The rule.** `create_ops.MARKER_RULE` tells every reviewer to write the
 blocking marker only at the start of a finding line, in its plain form,
-and to call it "the blocking marker" when discussing it. Every site that
+to call it "the blocking marker" when discussing it, and to put any
+example of the format inside a fenced code block. It is a prompt rule, so
+it makes a misread less likely rather than impossible. Every site that
 showed the finding format in a code span now shows it as plain text. The
 parser (`blocking_findings`) is unchanged: a real finding written in any
 form still blocks.
 
 **Held by.** `test_follow_ups.py::test_every_reviewer_carries_marker_rule`,
+`test_follow_ups.py::test_every_lowered_node_that_asks_for_findings_carries_the_rule`,
+`test_follow_ups.py::test_marker_rule_keeps_its_wording`,
 `test_follow_ups.py::test_verifier_prompt_carries_marker_rule`,
-`test_follow_ups.py::test_no_reviewer_prompt_shows_blocking_in_code_span`.
+`test_follow_ups.py::test_no_reviewer_prompt_shows_blocking_in_code_span`,
+`test_follow_ups.py::test_verifier_prompt_no_code_span_blocking`,
+`test_gate_stale_findings.py::test_reviewer_prompts_ask_for_structured_blocking_format`.

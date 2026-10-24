@@ -378,6 +378,45 @@ def test_every_reviewer_carries_marker_rule(tmp_path, mode_path, reviewers):
         )
 
 
+def test_marker_rule_keeps_its_wording():
+    # The rule's wording is the whole fix (dm-198, dm-225): pin each clause, so
+    # emptying or shortening it fails, not only removing it from a prompt.
+    for clause in (
+        "only at the start of a finding line",
+        "plain form: BLOCKING: <path>: <description>",
+        "Never wrap it in backticks, a code span, or quotation marks",
+        'call it "the blocking marker"',
+        "inside a fenced code block",
+    ):
+        assert clause in MARKER_RULE, clause
+    assert chr(96) not in MARKER_RULE
+
+
+@pytest.mark.parametrize("mode_path", [
+    "refactory_dsh.design:DesignMode",
+    "refactory_dsh.create:CreateMode",
+    "refactory_dsh.edit:EditMode",
+    "refactory_dsh.fast:DesignFastMode",
+    "refactory_dsh.fast:CreateFastMode",
+    "refactory_dsh.fast:EditFastMode",
+])
+def test_every_lowered_node_that_asks_for_findings_carries_the_rule(tmp_path, mode_path):
+    # Not a hand-kept reviewer list: every node of the lowered graph whose prompt
+    # shows the finding form, the verifier included, must carry the rule.
+    import importlib
+    import json
+
+    module, cls = mode_path.split(":")
+    mode = getattr(importlib.import_module(module), cls)()
+    path, _workflow = lowering.write_mode_graph(mode.state_dict(), tmp_path, name="x")
+    nodes = json.loads(path.read_text())["nodes"]
+    asking = [node_id for node_id, node in nodes.items()
+              if "BLOCKING: <" in str(node.get("prompt_template") or "")]
+    assert asking, f"{mode_path}: no lowered node asks for blocking findings"
+    for node_id in asking:
+        assert MARKER_RULE in nodes[node_id]["prompt_template"], (mode_path, node_id)
+
+
 def test_verifier_prompt_carries_marker_rule():
     from refactory_dsh.verification import VERIFIER_PROMPT, FULL_VERIFIER_PROMPT
     assert MARKER_RULE in VERIFIER_PROMPT
@@ -419,6 +458,8 @@ def test_no_reviewer_prompt_shows_blocking_in_code_span(mode_path, reviewers):
         prompt = nodes[reviewer].prompt_template
         assert "`BLOCKING" not in prompt, f"{reviewer} prompt contains `BLOCKING code span"
         assert "BLOCKING:`" not in prompt, f"{reviewer} prompt contains BLOCKING:` code span"
+        assert '"BLOCKING' not in prompt and "'BLOCKING" not in prompt, (
+            f"{reviewer} prompt quotes the marker")
 
 
 def test_verifier_prompt_no_code_span_blocking():

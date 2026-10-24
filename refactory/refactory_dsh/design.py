@@ -403,7 +403,7 @@ class DesignMode(Mode):
                 "- An ask in the brief with no row in the Ask mapping table, or whose "
                 "named test does not exercise it.\n\n"
                 "List each finding as a line starting with BLOCKING: <path>: <description> where <path> is the file the builder must change to fix the problem. " + MARKER_RULE + "\n\n"
-                "Write anything else under `## Notes`, never as BLOCKING: a doc the "
+                "Write anything else under `## Notes`, never as a blocking finding: a doc the "
                 "'## Docs' section leaves out, a missing or thin Failure trace, a "
                 "quotation that differs only in punctuation or formatting, and style or "
                 "structure that does not change the build. Notes do not send the design "
@@ -595,7 +595,7 @@ class DesignMode(Mode):
                 "{{review_instructions}}\n"
                 "Changed functions:\n{{changed_functions}}\n\n"
                 "When a false claim about design.md is found, report it against the code file "
-                "that relies on the claim, not against design.md, because BLOCKING: design.md "
+                "that relies on the claim, not against design.md, because a blocking finding against design.md "
                 "is downgraded by scope_filter_findings.\n"
             ),
             reads=("brief.json", "design.md", "emit.txt", "pitfalls.json",

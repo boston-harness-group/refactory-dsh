@@ -483,12 +483,14 @@ def test_gate_overwatch_downgrades_design_md_finding(tmp_path, monkeypatch):
 def test_reviewer_prompts_ask_for_structured_blocking_format():
     """Every post-build reviewer prompt contains the structured BLOCKING: <path>: form."""
     from refactory_dsh.create import CreateMode
+    from refactory_dsh.create_ops import MARKER_RULE
     from refactory_dsh.design import DesignMode
 
     create_graph = CreateMode().build()
     for node_id in ("health_checker", "code_reviewer", "qa_director", "overwatch"):
         prompt = create_graph.nodes[node_id].prompt_template
-        assert "BLOCKING: <path>:" in prompt, (
+        # MARKER_RULE quotes the form too, so look for the site's own sentence.
+        assert "BLOCKING: <path>:" in prompt.replace(MARKER_RULE, ""), (
             f"CreateMode {node_id} prompt missing structured BLOCKING format"
         )
         assert "file the builder must change" in prompt, (
@@ -498,7 +500,8 @@ def test_reviewer_prompts_ask_for_structured_blocking_format():
     design_graph = DesignMode().build()
     for node_id in ("health_checker", "code_reviewer", "qa_director", "overwatch", "design_review"):
         prompt = design_graph.nodes[node_id].prompt_template
-        assert "BLOCKING: <path>:" in prompt, (
+        # MARKER_RULE quotes the form too, so look for the site's own sentence.
+        assert "BLOCKING: <path>:" in prompt.replace(MARKER_RULE, ""), (
             f"DesignMode {node_id} prompt missing structured BLOCKING format"
         )
         # design_review is a pre-build reviewer; the distinction sentence applies
