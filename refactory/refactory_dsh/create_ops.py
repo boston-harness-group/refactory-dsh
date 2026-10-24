@@ -321,13 +321,12 @@ def prepare(ctx: Any) -> dict[str, Any]:
     }
 
 
-def _plan(text: str) -> list[dict[str, Any]]:
-    """The plan's entries, or an empty list when the answer is not a plan.
+def _extract_json_array(text: str) -> list[dict[str, Any]]:
+    """Extract the first JSON array from *text*, tolerating fences and prose.
 
-    Tolerant about the fences and prose around the array — a model that writes
-    "here is the plan:" before it has still written a plan — and intolerant about
-    everything else, because the alternative is a downstream stage that runs on a
-    stage which did nothing.
+    Returns the raw dicts (all keys preserved) or an empty list when the text
+    contains no parseable array.  Both ``_plan`` and ``classify_scale`` use this
+    so there is exactly one tolerant-array extractor.
     """
     start, end = text.find("["), text.rfind("]")
     if start < 0 or end < start:
@@ -338,10 +337,19 @@ def _plan(text: str) -> list[dict[str, Any]]:
         return []
     if not isinstance(payload, list):
         return []
+    return [item for item in payload if isinstance(item, dict)]
+
+
+def _plan(text: str) -> list[dict[str, Any]]:
+    """The plan's entries, or an empty list when the answer is not a plan.
+
+    Tolerant about the fences and prose around the array — a model that writes
+    "here is the plan:" before it has still written a plan — and intolerant about
+    everything else, because the alternative is a downstream stage that runs on a
+    stage which did nothing.
+    """
     entries: list[dict[str, Any]] = []
-    for item in payload:
-        if not isinstance(item, dict):
-            continue
+    for item in _extract_json_array(text):
         entries.append({
             key: str(item.get(key) or "").strip() for key in ("focus", "slug", "finding")
         } | {"ids": item.get("ids") or []})

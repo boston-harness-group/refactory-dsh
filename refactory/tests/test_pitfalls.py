@@ -294,11 +294,13 @@ def test_design_graph_has_pitfalls_nodes():
     graph = DesignMode().build()
     assert "pitfalls_researcher" in graph.nodes
     assert "gate_pitfalls" in graph.nodes
-    # Wiring: gate_research → pitfalls_researcher → gate_pitfalls → route_strategy, which
-    # goes on to strategy_director for a full design (test_design_short_path.py).
+    # Wiring: gate_research → classify_scale → pitfalls_researcher → gate_pitfalls →
+    # route_strategy, which goes on to strategy_director for a full design.
     proceed_edges = graph.out_edges("gate_research", condition="proceed")
     assert len(proceed_edges) == 1
-    assert proceed_edges[0].target == "pitfalls_researcher"
+    assert proceed_edges[0].target == "classify_scale"
+    cs_edges = graph.out_edges("classify_scale")
+    assert cs_edges[0].target == "pitfalls_researcher"
     pit_edges = graph.out_edges("pitfalls_researcher")
     assert pit_edges[0].target == "gate_pitfalls"
     gp_proceed = graph.out_edges("gate_pitfalls", condition="proceed")

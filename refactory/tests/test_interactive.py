@@ -360,6 +360,7 @@ def test_prepare_design_sets_scoped_for_refine_task(tmp_path, monkeypatch):
     ctx = nn.RunContext(workdir, task=task)
     result = design_ops.prepare_design(ctx, deliver=True, in_worktree=False)
     assert result["research_scope"] == "scoped"
+    assert result["research_scope_reason"] == "refinement of an open pull request"
 
 
 def test_prepare_design_sets_scoped_for_refine_without_file_in_brief(tmp_path, monkeypatch):
@@ -381,11 +382,12 @@ def test_prepare_design_sets_scoped_for_refine_without_file_in_brief(tmp_path, m
     ctx = nn.RunContext(workdir, task=task)
     result = design_ops.prepare_design(ctx, deliver=True, in_worktree=False)
     assert result["research_scope"] == "scoped"
+    assert result["research_scope_reason"] == "refinement of an open pull request"
 
 
-def test_prepare_design_sets_scoped_for_brief_with_file_extension(
+def test_prepare_design_sets_full_even_when_brief_names_a_file(
         tmp_path, monkeypatch):
-    """A brief naming worker_observer.mjs → research_scope='scoped'."""
+    """A brief naming worker_observer.mjs → research_scope='full' (no file-ext heuristic)."""
     from refactory_dsh import design_ops, nn, repo_change, sandbox
     monkeypatch.setattr(repo_change, "wants_worktree", lambda ctx: False)
     monkeypatch.setattr(repo_change, "locate",
@@ -400,11 +402,12 @@ def test_prepare_design_sets_scoped_for_brief_with_file_extension(
             "check": "python -m pytest -q"}
     ctx = nn.RunContext(workdir, task=task)
     result = design_ops.prepare_design(ctx, deliver=False)
-    assert result["research_scope"] == "scoped"
+    assert result["research_scope"] == "full"
+    assert result["research_scope_reason"] == ""
 
 
 def test_prepare_design_sets_full_for_plain_prose(tmp_path, monkeypatch):
-    """'Make the UI better.' — period is not a file extension → 'full'."""
+    """'Make the UI better.' — non-refine → 'full'."""
     from refactory_dsh import design_ops, nn, repo_change, sandbox
     monkeypatch.setattr(repo_change, "wants_worktree", lambda ctx: False)
     monkeypatch.setattr(repo_change, "locate",
@@ -420,6 +423,7 @@ def test_prepare_design_sets_full_for_plain_prose(tmp_path, monkeypatch):
     ctx = nn.RunContext(workdir, task=task)
     result = design_ops.prepare_design(ctx, deliver=False)
     assert result["research_scope"] == "full"
+    assert result["research_scope_reason"] == ""
 
 
 def _gate_ctx(tmp_path, *, research_scope, direction_count):

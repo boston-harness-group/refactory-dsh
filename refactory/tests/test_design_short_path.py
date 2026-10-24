@@ -17,8 +17,8 @@ from refactory_dsh.design_ops import (SCOPED_STRATEGY_PLAN, gate_design_review,
                                       route_design_review, route_strategy)
 from test_design_contract_extensions import FakeCtx, _make_design
 from tests_support import (DESIGN_DOC_ANSWER, DESIGN_REVIEW_ANSWER, PITFALLS_ANSWER,
-                           RESEARCH_ANSWER, VERIFICATION_ANSWER, FakeModel, git_repo,
-                           render)
+                           RESEARCH_ANSWER, SCOPED_RESEARCH_ANSWER, VERIFICATION_ANSWER,
+                           FakeModel, git_repo, render)
 
 STRATEGY_DIRECTOR = "You are the strategy director."
 DESIGN_REVIEWER = "For every high-risk pitfall, confirm the design accounts for it"
@@ -32,6 +32,8 @@ def _edges(graph):
 def test_the_design_graph_routes_on_the_scale():
     graph = DesignMode().build()
     edges = _edges(graph)
+    assert ("gate_research", "classify_scale", "proceed") in edges
+    assert ("classify_scale", "pitfalls_researcher", None) in edges
     assert ("gate_pitfalls", "route_strategy", "proceed") in edges
     assert ("route_strategy", "strategy_director", "proceed") in edges
     assert ("route_strategy", "synthesize_strategy", "scoped") in edges
@@ -75,7 +77,9 @@ def test_the_routing_gates_answer_by_the_scale(tmp_path):
     assert full.facts["design_review_by"] == "agent"
 
 
+_SCOPED_REASON = "touches 1 existing function(s) (app.main at app.py:1), adds nothing new, no shared engine"
 AUTOMATIC = {"name": "short", "has_pitfalls_step": False, "research_scope": "scoped",
+             "research_scope_reason": _SCOPED_REASON,
              "design_review_by": "automatic"}
 
 
@@ -85,7 +89,9 @@ def test_a_scoped_gate_judges_only_its_own_checks():
     ctx = FakeCtx(files={"reviews/design-review.md": review, "design.md": _make_design(),
                          "brief.json": json.dumps({"brief": "a tool"})}, facts=dict(AUTOMATIC))
     assert gate_design_review(ctx) == "proceed"
-    assert ctx.facts["design_review_status"] == "Design review (automatic checks; scoped change): PASS"
+    assert ctx.facts["design_review_status"] == (
+        "Design review (automatic checks; scoped change"
+        " \u2014 " + _SCOPED_REASON + "): PASS")
     assert "stale note" not in ctx.facts["design_review_advisory"]
     # Its own checks still block: a design with no Ask mapping goes back once for a
     # rewrite, and only then reaches the person with the problem shown.
@@ -95,7 +101,8 @@ def test_a_scoped_gate_judges_only_its_own_checks():
     assert first == "reloop" and "Ask mapping" in first.reason
     assert gate_design_review(ctx) == "proceed"
     assert ctx.facts["design_review_status"].startswith(
-        "Design review (automatic checks; scoped change): FAIL, 1 unresolved")
+        "Design review (automatic checks; scoped change"
+        " \u2014 " + _SCOPED_REASON + "): FAIL, 1 unresolved")
 
 
 def test_a_run_whose_review_agent_ran_keeps_its_review():
@@ -142,16 +149,18 @@ def test_a_scoped_change_runs_the_short_path_end_to_end(tmp_path, monkeypatch):
 
     monkeypatch.setattr(agent_delivery, "begin", strict_begin)
     run, model = _design_run(tmp_path, "Make tool.py print built.", [
-        RESEARCH_ANSWER, PITFALLS_ANSWER, "one plan", DESIGN_DOC_ANSWER, *BUILD])
+        SCOPED_RESEARCH_ANSWER, PITFALLS_ANSWER, "one plan", DESIGN_DOC_ANSWER, *BUILD])
 
     assert run.exit_ok, run.error
     assert run.facts["research_scope"] == "scoped"
+    assert "research_scope_reason" in run.facts
     assert not [p for p in model.prompts if STRATEGY_DIRECTOR in p]
     assert not [p for p in model.prompts if DESIGN_REVIEWER in p]
     plan = next(p for p in model.prompts if PLAN_STEP in p)
     assert "no perspectives: this is a scoped change" in plan
     assert run.facts["design_review_status"].startswith(
-        "Design review (automatic checks; scoped change): PASS")
+        "Design review (automatic checks; scoped change")
+    assert ": PASS" in run.facts["design_review_status"]
 
 
 def test_a_scoped_design_the_checks_block_is_rewritten_once_before_the_gate(tmp_path):
@@ -162,13 +171,15 @@ def test_a_scoped_design_the_checks_block_is_rewritten_once_before_the_gate(tmp_
     without_mapping = re.sub(r"## Ask mapping\n\n.*?\n\n(?=## )", "", DESIGN_DOC_ANSWER, flags=re.S)
     assert "## Ask mapping" not in without_mapping
     run, model = _design_run(tmp_path, "Make tool.py print built.", [
-        RESEARCH_ANSWER, PITFALLS_ANSWER, "one plan", without_mapping, DESIGN_DOC_ANSWER, *BUILD])
+        SCOPED_RESEARCH_ANSWER, PITFALLS_ANSWER, "one plan", without_mapping, DESIGN_DOC_ANSWER, *BUILD])
 
     assert run.exit_ok, run.error
     writes = [p for p in model.prompts if "Write the design document for this artifact" in p]
     assert len(writes) == 2
     assert "Ask mapping" in writes[1]
-    assert run.facts["design_review_status"] == "Design review (automatic checks; scoped change): PASS"
+    assert run.facts["design_review_status"].startswith(
+        "Design review (automatic checks; scoped change")
+    assert ": PASS" in run.facts["design_review_status"]
 
 
 def test_a_full_design_keeps_both_steps(tmp_path):

@@ -416,24 +416,33 @@ when the gate's own checks block its design, it goes back to `design_doc` once f
 rewrite before the person sees it. A full design gets `design_review_attempts`
 (default 2).
 
-**Design scale.** `prepare_design` sets `research_scope`: `scoped` for a refine or a
-brief that names files, otherwise `full`. The design phase follows it. A scoped change
-gets one research question (two or three only when it spans unrelated parts of the
-code) and at most five pitfalls, and two steps are left out: `route_strategy` sends it
-from the pitfalls straight to `synthesize_strategy`, which plans "the simplest thing
-that could pass the check" from the research and pitfalls with no perspectives step,
-and `route_design_review` sends its design from `check_design_claims` straight to
-`gate_design_review`, whose own checks (an Ask mapping present, citations and quotes
-true, high-risk pitfalls answered, required sections present) and the person's
-approval are its review — there is no agent to flag an ask without a row, an open
-alternative or a design-time repository question; the approval gate's status line
-says "Design review (automatic checks; scoped change)". `route_design_review` records
-which in `design_review_by`, so a run whose graph predates it keeps its agent's
-review. Both routing gates answer `scoped` or `proceed` (also what a person's skip of
-a gate sends on the spine), which both runtimes follow as edge labels. A full design keeps three to five questions, two to five
-perspectives and the design-review agent. At either scale the design cites a research
-finding only where it changes a decision; the findings stay in `research/` and
-`strategy/` for the design writer and the reviewer to read.
+**Design scale.** Scale is decided after research by a deterministic `classify_scale`
+op node placed between `gate_research` and `pitfalls_researcher`. `prepare_design`
+sets `research_scope` to `scoped` for a `--refine` run (with
+`research_scope_reason` = `"refinement of an open pull request"`), or `full` with an
+empty reason otherwise. After `gate_research` proceeds, `classify_scale` reads every
+direction's `footprint` object from `research-plan.json` and applies a three-part
+rule: the change is scoped only when it touches at most two existing functions, adds
+nothing new, and changes no shared engine. Anything else is full; so is a direction
+with no footprint key, or an entry without file:line evidence. The brief is never
+read by the classifier. The `research_scope_reason` fact records why the run was
+classed as it was. A scoped change gets at most five pitfalls, and two steps are
+left out: `route_strategy` sends it from the pitfalls straight to
+`synthesize_strategy`, which plans "the simplest thing that could pass the check"
+from the research and pitfalls with no perspectives step, and `route_design_review`
+sends its design from `check_design_claims` straight to `gate_design_review`, whose
+own checks (an Ask mapping present, citations and quotes true, high-risk pitfalls
+answered, required sections present) and the person's approval are its review — there
+is no agent to flag an ask without a row, an open alternative or a design-time
+repository question; the approval gate's status line says "Design review (automatic
+checks; scoped change — <reason>)". `route_design_review` records which in
+`design_review_by`, so a run whose graph predates it keeps its agent's review. Both
+routing gates answer `scoped` or `proceed` (also what a person's skip of a gate sends
+on the spine), which both runtimes follow as edge labels. Non-refine research is
+always 3 to 5 directions. A full design keeps the perspectives step and the
+design-review agent. At either scale the design cites a research finding only where
+it changes a decision; the findings stay in `research/` and `strategy/` for the
+design writer and the reviewer to read.
 
 The `deliverable_kind` fact, computed by `prepare_design`, distinguishes repository
 changes from artifacts. The `review_instructions` fact renders `REPO_CHANGE_REVIEW_INSTRUCTIONS`

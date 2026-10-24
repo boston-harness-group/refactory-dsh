@@ -18,6 +18,10 @@
       "max_iterations": 4,
       "_type": "GateNode"
     },
+    "classify_scale": {
+      "id": "classify_scale",
+      "_type": "FnNode"
+    },
     "code_reviewer": {
       "id": "code_reviewer",
       "role": "ceo",
@@ -232,6 +236,11 @@
       "condition": "proceed"
     },
     {
+      "source": "classify_scale",
+      "target": "pitfalls_researcher",
+      "condition": null
+    },
+    {
       "source": "deliver",
       "target": "delivery_gate",
       "condition": null
@@ -323,7 +332,7 @@
     },
     {
       "source": "gate_research",
-      "target": "pitfalls_researcher",
+      "target": "classify_scale",
       "condition": "proceed"
     },
     {

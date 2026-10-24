@@ -328,6 +328,38 @@ RESEARCH_ANSWER = json.dumps([
         "ids": ["FND-acceptance-1"],
     },
 ])
+
+#: A research answer with footprints that satisfy the scoped rule.
+#: Every direction carries a footprint.  Directions that touch no code record
+#: empty footprints.  The aggregate: 1 existing function, no new items, no
+#: shared engine → scoped.
+SCOPED_RESEARCH_ANSWER = json.dumps([
+    {
+        "focus": "which API surface the package builds against",
+        "slug": "api-surface",
+        "finding": "the mode API in the checkout: nn.Mode, nn.Graph, ctx.knob/read_json/write_json",
+        "ids": ["FND-api-surface-1"],
+        "footprint": {
+            "existing_functions": ["app.py:1 app.main"],
+            "new_items": [],
+            "shared_engine": [],
+        },
+    },
+    {
+        "focus": "what already exists that this resembles",
+        "slug": "existing-modes",
+        "finding": "circle_packing/adaptive is the closest existing mode and is not this",
+        "ids": ["FND-existing-modes-1"],
+        "footprint": {"existing_functions": [], "new_items": [], "shared_engine": []},
+    },
+    {
+        "focus": "the acceptance criteria the brief asks for",
+        "slug": "acceptance",
+        "finding": "the mode must count to a target and score how close it landed",
+        "ids": ["FND-acceptance-1"],
+        "footprint": {"existing_functions": [], "new_items": [], "shared_engine": []},
+    },
+])
 PERSPECTIVES_ANSWER = "perspectives: the simplest thing that works, and the criteria"
 DESIGN_ANSWER = "a design"
 #: The three reviews and the overwatch pass. Overwatch states its verdict because

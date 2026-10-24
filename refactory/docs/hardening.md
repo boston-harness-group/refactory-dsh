@@ -2095,6 +2095,56 @@ fork branches at once (`nn/fork.MAX_WORKERS`), the design review fork's width, a
 serial fork no longer stops at a failed optional branch: as on the concurrent path, it
 is missing and the branches after it run.
 
+## Design scale classification (dm-200)
+
+### Evidence
+
+39 of the last 40 design runs on the lab were classed scoped because their briefs
+named a file.  Run b37a_disputed was a structural change across six graphs, classed
+scoped because its brief named files; it needed six corrections at the gate and
+failed to converge at ~$765.
+
+### The rule
+
+`classify_scale` (`design_ops.py`) runs after `gate_research` proceeds.  It reads
+every direction's `footprint` object from `research-plan.json` and applies a
+three-part rule: the change is scoped only when it touches at most two existing
+functions, adds nothing new, and changes no shared engine.  Anything else is full;
+so is a direction with no footprint key, or an entry without file:line evidence.
+The brief is never read by the classifier.
+
+### The reason fact
+
+`research_scope_reason` records why the run was classed as it was:
+- scoped: the functions it touches, and that it adds nothing and changes no engine;
+- full: the first thing that made it full, or that the research recorded no usable
+  footprint;
+- refine: that it is a refinement.
+
+The reason appears on `gate_strategy`'s card, in `design_review_status`'s output,
+and in the CLI print at design lines 937 and 1029.
+
+### Tests that hold it
+
+- `test_design_scale.py::test_classify_scale_scoped_footprint`
+- `test_design_scale.py::test_classify_scale_no_footprint_means_full`
+- `test_design_scale.py::test_classify_scale_too_many_functions`
+- `test_design_scale.py::test_classify_scale_adds_new_items`
+- `test_design_scale.py::test_classify_scale_shared_engine`
+- `test_design_scale.py::test_classify_scale_refine_stays_scoped`
+- `test_design_scale.py::test_classify_scale_brief_cannot_classify_itself`
+- `test_design_scale.py::test_doc_only_research_with_empty_footprints_is_scoped`
+- `test_design_scale.py::test_footprint_entry_without_evidence_is_full`
+- `test_design_scale.py::test_structural_brief_naming_files_is_full`
+- `test_design_scale.py::test_one_line_doc_fix_stays_scoped`
+- `test_design_scale.py::test_refine_run_stays_scoped`
+- `test_design_scale.py::test_classify_scale_reason_in_design_review_status`
+- `test_design_scale.py::test_classify_scale_through_run`
+- `test_design_scale.py::test_same_named_functions_in_different_files_count_separately`
+- `test_design_scale.py::test_research_director_footprint_instruction_clauses`
+- `test_design_short_path.py::test_the_design_graph_routes_on_the_scale`
+- `test_interactive.py::test_prepare_design_sets_full_even_when_brief_names_a_file`
+
 **Tests.** `test_check_beside_reviews.py`: the graph and the lowered workflow; what the
 reviews read and see; scripted runs whose check passes, and whose first check fails
 (two emits, the second carrying the failure, both attempts reviewed); `gate_check`'s

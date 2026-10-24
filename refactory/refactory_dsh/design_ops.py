@@ -21,9 +21,10 @@ from refactory_dsh import delivery, repo_change, sandbox, unbuilt_check, worktre
 from refactory_dsh.invocations import CHECK_PREP, CHECK_VERDICT
 from refactory_dsh.nn import Verdict
 
-_FILE_EXT_RE = _re.compile(
-    r'\b[\w/.-]+\.(?:py|ts|js|mjs|cjs|jsx|tsx|json|md|yaml|yml|toml|go|rs|rb|java|c|cpp|h|sh|css|html)\b'
-)
+#: The reason prepare_design writes when the run is a refinement.  classify_scale
+#: recognises a refine by this constant rather than reading research_scope (which
+#: classify_scale itself writes), so a rerun reclassifies from the footprint.
+REFINE_SCOPE_REASON = "refinement of an open pull request"
 
 STAGING = "staging"
 
@@ -151,13 +152,14 @@ def prepare_design(ctx: Any, *, deliver: bool = True, in_worktree: bool | None =
                                  needs_worktree=("refine",) if deliver else (),
                                  output_only=PLANNING_STEPS)
 
-    # Compute research_scope: 'scoped' for --refine or briefs naming files.
+    # Compute research_scope.  A refine is always scoped; everything else starts
+    # as full and is reclassified by classify_scale after research.
     if str(task.get("refine") or "").strip():
         research_scope = "scoped"
-    elif _FILE_EXT_RE.search(brief):
-        research_scope = "scoped"
+        research_scope_reason = REFINE_SCOPE_REASON
     else:
         research_scope = "full"
+        research_scope_reason = ""
 
     # Match create/edit: inspect the exact nested route before launching research.
     # Other ModelClient implementations retain their own readiness contract.
@@ -221,7 +223,8 @@ def prepare_design(ctx: Any, *, deliver: bool = True, in_worktree: bool | None =
         "design_review_status": "",
     } if deliver else {}
     return {"name": name, "brief": brief, "check": check, "validation": "(no check has run yet)",
-            "research_review": "(no research review has run yet)", "research_scope": research_scope,
+            "research_review": "(no research review has run yet)",
+            "research_scope": research_scope, "research_scope_reason": research_scope_reason,
             "design_review_feedback": "(no design review has run yet)",
             "design_review_findings": "(no findings yet)",
             "deliverable_kind": deliverable_kind,
@@ -589,6 +592,176 @@ def gate_design_review(ctx: Any) -> str:
     return Verdict("reloop", report)
 
 
+def classify_scale(ctx: Any) -> dict[str, Any]:
+    """Deterministic op: classify the change's scale from the research footprint.
+
+    Reads research-plan.json as raw JSON (not via ``_plan()``, which strips
+    entries to only focus/slug/finding/ids).  Every direction must carry a
+    ``footprint`` object.  The three-part rule decides scoped vs full; the
+    brief is never read.
+    """
+    # ── refine detection ───────────────────────────────────────────────
+    # prepare writes REFINE_SCOPE_REASON for a refine run.  Detect that
+    # constant rather than reading research_scope (which we write ourselves).
+    if ctx.facts.get("research_scope_reason") == REFINE_SCOPE_REASON:
+        return {
+            "research_scope": "scoped",
+            "research_scope_reason": REFINE_SCOPE_REASON,
+        }
+
+    # ── read directions ────────────────────────────────────────────────
+    from refactory_dsh.create_ops import _extract_json_array
+
+    raw = ctx.read_text("research-plan.json") if ctx.exists("research-plan.json") else ""
+    directions = _extract_json_array(raw)
+
+    if not directions:
+        return {
+            "research_scope": "full",
+            "research_scope_reason": "no usable footprint in the research",
+        }
+
+    # ── resolve source for path existence checks ──────────────────────
+    source = str(ctx.facts.get("source") or ctx.facts.get("artifact") or "")
+
+    def _path_exists(file_path: str) -> bool:
+        """True when *source* is known and *file_path* is a file under it."""
+        if not source:
+            return True  # no checkout to verify against
+        return (Path(source) / file_path).is_file()
+
+    # ── aggregate footprint ────────────────────────────────────────────
+    all_existing: dict[tuple[str, str], str] = {}   # (path, name) -> loc
+    all_new: dict[str, str] = {}        # name -> at
+    shared_engine_refs: list[str] = []
+    has_shared_engine = False
+
+    _FULL_NO_FP: dict[str, Any] = {
+        "research_scope": "full",
+        "research_scope_reason": "no usable footprint in the research",
+    }
+
+    for d in directions:
+        fp = d.get("footprint") if isinstance(d, dict) else None
+        if fp is None:
+            return dict(_FULL_NO_FP)
+        if not isinstance(fp, dict):
+            return dict(_FULL_NO_FP)
+
+        # existing_functions — each entry is "path:line name"
+        existing = fp.get("existing_functions", [])
+        if existing is None or not isinstance(existing, list):
+            return dict(_FULL_NO_FP)
+        for entry in existing:
+            if not isinstance(entry, str) or ":" not in entry:
+                return {
+                    "research_scope": "full",
+                    "research_scope_reason": f"footprint without evidence: {entry!r}",
+                }
+            # Parse "path:line name" — at least "x:1 y"
+            parts = entry.split(None, 1)
+            loc = parts[0] if parts else entry
+            name = parts[1] if len(parts) > 1 else loc
+            # Verify the cited path exists under the source checkout
+            file_path = loc.split(":")[0]
+            if not _path_exists(file_path):
+                return {
+                    "research_scope": "full",
+                    "research_scope_reason": f"footprint without evidence: {entry!r}",
+                }
+            all_existing[(file_path, name)] = loc
+
+        # new_items — each entry names what is added and the path
+        new_items_list = fp.get("new_items", [])
+        if new_items_list is None or not isinstance(new_items_list, list):
+            return dict(_FULL_NO_FP)
+        for entry in new_items_list:
+            if not isinstance(entry, str) or ":" not in entry:
+                return {
+                    "research_scope": "full",
+                    "research_scope_reason": f"footprint without evidence: {entry!r}",
+                }
+            # Verify the cited path exists under the source checkout
+            colon_idx = entry.index(":")
+            before_colon = entry[:colon_idx]
+            path_parts = before_colon.rsplit(None, 1)
+            file_path = path_parts[-1] if path_parts else before_colon
+            if not _path_exists(file_path):
+                return {
+                    "research_scope": "full",
+                    "research_scope_reason": f"footprint without evidence: {entry!r}",
+                }
+            all_new[entry] = entry
+
+        # shared_engine — list of "path:line" citations
+        se = fp.get("shared_engine", [])
+        if se is None or se is False:
+            se = []  # an explicit "no shared engine"
+        if not isinstance(se, list):
+            if se is True:
+                # tolerate boolean true with no evidence
+                return {
+                    "research_scope": "full",
+                    "research_scope_reason": "footprint without evidence: shared_engine true without citations",
+                }
+            # Any other shape (a bare "path:line" string, a number, an object) is
+            # unreadable evidence, so the safe class is full, never a silent [].
+            return {
+                "research_scope": "full",
+                "research_scope_reason": f"footprint without evidence: shared_engine {se!r}",
+            }
+        if se:
+            has_shared_engine = True
+            for ref in se:
+                if not isinstance(ref, str) or ":" not in ref:
+                    return {
+                        "research_scope": "full",
+                        "research_scope_reason": f"footprint without evidence: shared_engine {ref!r}",
+                    }
+                # Verify the cited path exists under the source checkout
+                file_path = ref.split(":")[0]
+                if not _path_exists(file_path):
+                    return {
+                        "research_scope": "full",
+                        "research_scope_reason": f"footprint without evidence: shared_engine {ref!r}",
+                    }
+                shared_engine_refs.append(ref)
+
+    # ── apply the three-part rule ──────────────────────────────────────
+    if len(all_existing) > 2:
+        names = ", ".join(k[1] for k in sorted(all_existing)[:3])
+        return {
+            "research_scope": "full",
+            "research_scope_reason": (
+                f"touches {len(all_existing)} existing functions "
+                f"(max 2 for scoped): {names}"
+            ),
+        }
+
+    if all_new:
+        names = ", ".join(sorted(all_new)[:3])
+        return {
+            "research_scope": "full",
+            "research_scope_reason": f"adds new items: {names}",
+        }
+
+    if has_shared_engine:
+        return {
+            "research_scope": "full",
+            "research_scope_reason": "changes a shared engine",
+        }
+
+    # scoped
+    fn_keys = sorted(all_existing)
+    detail = ", ".join(f"{k[1]} at {all_existing[k]}" for k in fn_keys) if fn_keys else ""
+    reason = (
+        f"touches {len(all_existing)} existing function(s)"
+        + (f" ({detail})" if detail else "")
+        + ", adds nothing new, no shared engine"
+    )
+    return {"research_scope": "scoped", "research_scope_reason": reason}
+
+
 def design_review_status(facts: dict) -> str:
     """One-line status for the approval gate, from the run's facts.
 
@@ -606,11 +779,18 @@ def design_review_status(facts: dict) -> str:
     advisory_n = sum(1 for ln in str(facts.get("design_review_advisory", "")).splitlines()
                      if ln.startswith("- "))
     advisory = f", {advisory_n} advisory" if advisory_n else ""
+    reason = facts.get("research_scope_reason", "")
     # A scoped change's design had no review agent; the person is told so.
-    automatic = (" (automatic checks; scoped change)"
-                 if facts.get("design_review_by") == "automatic" else "")
+    automatic = ""
+    if facts.get("design_review_by") == "automatic":
+        automatic = (" (automatic checks; scoped change"
+                     + (f" — {reason}" if reason else "")
+                     + ")")
     if "(none: the design review" in findings:
-        return f"Design review{automatic}: PASS{advisory}"
+        status = f"Design review{automatic}: PASS{advisory}"
+        if not automatic and reason:
+            status += f"\nScale: full — {reason}"
+        return status
     blocking = facts.get("design_review_blocking")
     source = str(blocking) if blocking is not None else findings
     lines = [
@@ -619,10 +799,13 @@ def design_review_status(facts: dict) -> str:
         and not ln.startswith("- the review did not state 'VERDICT: PASS'")
     ]
     n = len(lines)
-    return (
+    status = (
         f"Design review{automatic}: FAIL, {n} unresolved{advisory}\n"
         + "\n".join(lines)
     )
+    if not automatic and reason:
+        status += f"\nScale: full — {reason}"
+    return status
 
 
 def _quote_words(text: str) -> str:

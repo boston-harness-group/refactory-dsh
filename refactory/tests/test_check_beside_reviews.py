@@ -19,6 +19,7 @@ from refactory_dsh import authoring_evidence as evidence, design_ops, lowering, 
 from refactory_dsh.design import DesignMode
 from refactory_dsh.invocations import CHECK_PREP, CHECK_VERDICT
 from tests_support import (DESIGN_DOC_ANSWER, PITFALLS_ANSWER, RESEARCH_ANSWER,
+                           SCOPED_RESEARCH_ANSWER,
                            VERIFICATION_ANSWER, FakeModel, git_repo, render)
 
 BESIDE = "## The check runs beside this review"
@@ -80,7 +81,7 @@ def _run(tmp_path, first_tool, answers_between):
     state["knobs"]["pr"]["value"] = False
     mode.load_state_dict(state)
     reviews = ["health: ok", "code review: ok", "qa: ok", VERIFICATION_ANSWER]
-    model = FakeModel([RESEARCH_ANSWER, PITFALLS_ANSWER, "one plan", DESIGN_DOC_ANSWER,
+    model = FakeModel([SCOPED_RESEARCH_ANSWER, PITFALLS_ANSWER, "one plan", DESIGN_DOC_ANSWER,
                        render({"tool.py": first_tool}), *reviews, *answers_between,
                        "VERDICT: PASS"])
     run = mode.run(tmp_path / "run", model=model, verdicts={"gate_strategy": "proceed"},

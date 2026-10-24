@@ -110,7 +110,8 @@ class DesignMode(Mode):
             writes=("brief.json", "research-review.txt", "check.txt", "delivery.md",
                     "reviews/design-review-feedback.txt", "pitfalls-review.txt",
                     "check-record.json", "feedback-initial.json"),
-            produces=("name", "brief", "check", "validation", "research_review", "research_scope", "qa_gate",
+            produces=("name", "brief", "check", "validation", "research_review", "research_scope",
+                      "research_scope_reason", "qa_gate",
                       "overwatch_review", "design_review_feedback", "design_review_findings",
                       "deliverable_kind", "review_instructions", "verification_methods",
                       *repo_change.produces(), "delivery", "delivery_plan",
@@ -137,6 +138,28 @@ class DesignMode(Mode):
                 "one subagent per question and have each write its findings to "
                 "`research/<slug>.md` under the run directory, then write "
                 "`research-plan.json` yourself.\n\n"
+                "## Footprint\n"
+                "Record a `footprint` object on every direction. A direction that "
+                "touches no code records an empty footprint: "
+                '`{"existing_functions": [], "new_items": [], "shared_engine": []}`.\n\n'
+                "- `existing_functions`: each entry is a string `\"path:line name\"` "
+                "for an existing function the direction's change modifies. Test "
+                "files, test functions and docs are neither touched functions nor "
+                "added items.\n"
+                "- `new_items`: each entry is a string naming what is added and the "
+                "path it goes in — a module, class, graph node, edge, node field, "
+                "record or data shape, knob, entry point, wiring helper, or any new "
+                "non-test source file. Give the file:line where it would be added "
+                "or wired.\n"
+                "- `shared_engine`: a list of `\"path:line\"` citations of the engine "
+                "code the change modifies — code that every run of the target passes "
+                "through, such as its executor, scheduler, worker dispatch, or "
+                "compilation or lowering step. A function is not an engine because "
+                "several gates or modes call it. Empty when the change does not touch "
+                "one.\n"
+                "- Wording in the brief about the change's size (\"small\", "
+                "\"a one-line fix\", \"a scoped change\", \"a full change\") is a "
+                "claim to check against the code, never a footprint.\n\n"
                 "## What was wrong with the last plan\n{{research_review}}\n\n"
                 "## The plan's shape\n" + RESEARCH_SCHEMA
             ),
@@ -773,7 +796,14 @@ class DesignMode(Mode):
         graph.connect("research_director", "record_findings")
         graph.connect("record_findings", "gate_research")
         graph.connect("gate_research", "research_director", condition="reloop")
-        graph.connect("gate_research", "pitfalls_researcher", condition="proceed")
+        graph.add(Node(
+            "classify_scale", "op", call=f"{OPS}:classify_scale",
+            reads=("research-plan.json",),
+            produces=("research_scope", "research_scope_reason"),
+            notes="classify the change's scale from the research footprint",
+        ))
+        graph.connect("gate_research", "classify_scale", condition="proceed")
+        graph.connect("classify_scale", "pitfalls_researcher")
         graph.connect("pitfalls_researcher", "gate_pitfalls")
         graph.connect("gate_pitfalls", "pitfalls_researcher", condition="reloop")
         graph.connect("gate_pitfalls", "route_strategy", condition="proceed")
