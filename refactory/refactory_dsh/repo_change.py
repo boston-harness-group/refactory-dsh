@@ -161,7 +161,7 @@ def materialise_node(**fields: Any) -> Node:
         "id": "materialise", "kind": "op", "call": f"{OPS}:materialise",
         "reads": (EMIT_FILE,), "writes": ("changes.diff", "changed-functions.json"),
         "produces": ("artifact", "files", "commit", "change", "emission_refused",
-                     "changed_functions"),
+                     "changed_functions", "consecutive_refusals"),
         "notes": "commit the emitted files on the run's branch, or write the artifact directory",
         **fields,
     })
@@ -733,6 +733,25 @@ def refuse_truncated(path: Path, text: str) -> None:
             "leave out the lines you could not read whole.")
 
 
+def _count_refusal(ctx: Any, refused: Exception) -> dict[str, Any]:
+    """Increment the consecutive-refusal counter and raise ``BuildLoopStop`` at the bound.
+
+    Called from both ``repo_change.materialise`` and ``create_ops.materialise``
+    (the shared helper the brief asks for).  A refusal still spends no attempt
+    (#330 E5); the bound is separate.
+    """
+    count = int(ctx.facts.get("consecutive_refusals", 0)) + 1
+    ctx.set_fact("consecutive_refusals", count)
+    bound = ctx.knob("refusal_attempts", 3)
+    if count >= bound:
+        from refactory_dsh.run import BuildLoopStop
+
+        raise BuildLoopStop(
+            f"emissions refused {count} consecutive times: {refused}"
+        )
+    return {"emission_refused": str(refused)}
+
+
 def materialise(ctx: Any, *, source: Path | None = None, files: tuple[str, ...] = ()) -> dict[str, Any]:
     """Make the emitted files the run's artifact: a commit in its worktree, when it has one.
 
@@ -754,14 +773,15 @@ def materialise(ctx: Any, *, source: Path | None = None, files: tuple[str, ...] 
         found = worktree.recorded(ctx.workdir)
         # Cleared only once set, so a run whose graph predates the fact still materialises.
         cleared = {"emission_refused": ""} if ctx.facts.get("emission_refused") else {}
+        reset_refusals = {"consecutive_refusals": 0}
         if found is None:
             change = (f"The artifact directory is a copy of {source} with this run's files applied."
                       if source is not None else "The artifact directory holds only the files this run wrote.")
             return {**_materialise_directory(ctx, source, files), "commit": NO_WORKTREE, **cleared,
-                    "change": change}
-        return {**_commit_emission(ctx), **cleared}
+                    **reset_refusals, "change": change}
+        return {**_commit_emission(ctx), **cleared, **reset_refusals}
     except AttemptRefused as refused:
-        return {"emission_refused": str(refused)}
+        return _count_refusal(ctx, refused)
 
 
 def apply_emission(answer: str, found: worktree.Worktree, workdir: Path, *,

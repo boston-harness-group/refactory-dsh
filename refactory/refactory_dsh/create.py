@@ -66,6 +66,10 @@ class CreateMode(Mode):
                 description="how many times the review gates may reloop before "
                             "stopping; defaults to the same as check_attempts",
             ),
+            "refusal_attempts": Knob(
+                3, "int", lo=1, hi=10, frozen=True,
+                description="consecutive no-op emissions before the run stops",
+            ),
             "research_attempts": Knob(
                 3, "int", lo=1, hi=8,
                 description="how many times the research step may be retried when its "
@@ -393,7 +397,8 @@ class CreateMode(Mode):
             "materialise", "op", call=f"{OPS}:materialise",
             reads=("emit.txt",),
             writes=("staging/manifest.json",),
-            produces=("package_path", "files", "emission_refused"),
+            produces=("package_path", "files", "emission_refused", "consecutive_refusals"),
+            knobs=("refusal_attempts",),
             notes="write the staged package to disk",
         ))
         # create-v2's `gate_build`: the built thing is checked before it is reviewed.

@@ -208,7 +208,10 @@ def _running(pid: int) -> bool:
     except ProcessLookupError:
         return False
     stat = Path(f"/proc/{pid}/stat")
-    return not (stat.exists() and stat.read_text().rsplit(")", 1)[-1].split()[0] == "Z")
+    try:
+        return not (stat.exists() and stat.read_text().rsplit(")", 1)[-1].split()[0] == "Z")
+    except (ProcessLookupError, FileNotFoundError):
+        return False  # reaped between exists() and read_text()
 
 
 def test_a_check_that_runs_out_of_time_stops_everything_it_started(tmp_path):

@@ -745,6 +745,63 @@ and the fail-open case when no run is open.
 
 ---
 
+## Build-loop stop signal and refusal bound (dm-202, dm-203)
+
+### The b36b evidence
+
+b36b_cc_sysprompt (2026-10-23) built for 3 h 10 min and cost $178.  Its
+build-loop limit fired at 17:22 ("review reloop limit reached after 3 review
+cycle(s)"), but the spine recorded it as status `ready` with `last_failure`
+(dm-95).  The CEO redid past it twice, spending $68 and 1 h 26 min after the
+limit had stopped the run.
+
+The recorded error began mid-sentence because the spine kept the tail of
+stderr and the reason was at the head (dm-203).
+
+### The fix
+
+**`BuildLoopStop(ValueError)`** in `refactory_dsh.run`: the exception type
+all build-loop limit stops raise.  Eight existing `raise ValueError` in
+`create_ops.repair` (5) and `fast_ops._repair` (3) now raise
+`BuildLoopStop` with the same messages.
+
+**Exit code 3** in `refactory_dsh.run.main()`: `BuildLoopStop` exits 3 with
+the `--- refactory failure ---` marker and `format_failure_detail` on
+stderr.  Not retried by `run_node` (alongside `BudgetExhausted`).
+
+**The spine** maps exit code 3 with the marker to status `failed` (terminal),
+not `ready` (retryable).  `wf_redo` refuses, and only
+`refactory graph-control rerun --acknowledge-failure` can proceed.
+
+**Refusal bound:** `consecutive_refusals` fact, `refusal_attempts` knob
+(default 3).  Counted by `_count_refusal` in `repo_change`, called from
+both `repo_change.materialise` and `create_ops.materialise`.  A refusal
+still spends no attempt (#330 E5); the bound is separate.
+
+**`format_failure_detail`:** reason (first line, ≤500 chars), then FAILED
+test ids via `parse_test_failures`, then clipped tail, total ≤2000 chars.
+`failureDetailOf` on the spine extracts post-marker text, falls back to
+head+tail for non-refactory commands.
+
+### Tests that hold each fix
+
+- `test_build_loop_stop.py::test_build_loop_stop_is_a_value_error`
+- `test_build_loop_stop.py::test_main_exits_3_for_build_loop_stop`
+- `test_build_loop_stop.py::test_main_exits_1_for_other_exceptions`
+- `test_build_loop_stop.py::test_run_node_does_not_retry_build_loop_stop`
+- `test_build_loop_stop.py::test_walker_stop_reaches_run_result_error`
+- `test_build_loop_stop.py::test_consecutive_refusals_end_the_run`
+- `test_build_loop_stop.py::test_interleaved_refusals_and_successes_converge`
+- `test_build_loop_stop.py::test_refusal_bound_holds_across_node_processes`
+- `test_build_loop_stop.py::test_format_failure_detail_reason_first`
+- `test_build_loop_stop.py::test_format_failure_detail_short_message_comes_back_whole`
+- `test_build_loop_stop.py::test_format_failure_detail_1200_char_message_no_repeat`
+- `correction.spec.ts: "exit code 3 with marker records failed and CEO tools refuse"`
+- `correction.spec.ts: "exit code 3 without marker records ready (dm-95 unchanged)"`
+- `correction.spec.ts: "exit code 1 records ready (dm-95 regression guard)"`
+- `correction.spec.ts: "acknowledged rerun after exit-3 stop runs the stopped node again"`
+- `correction.spec.ts: "failureDetailOf with run warnings before marker shows reason first"`
+
 ## What this does not cover
 
 - Listing a generated package still imports it (§1).

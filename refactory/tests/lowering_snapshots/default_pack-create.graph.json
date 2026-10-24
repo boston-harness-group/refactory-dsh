@@ -613,6 +613,7 @@
   "knob_values": {
     "attempts": 3.0,
     "review_attempts": 3.0,
+    "refusal_attempts": 3.0,
     "research_attempts": 3.0,
     "design_attempts": 2.0,
     "task_ref": "",
@@ -648,6 +649,17 @@
       "values": [],
       "frozen": false,
       "description": "how many times the review gates may reloop before stopping; defaults to the same as check_attempts",
+      "required": false
+    },
+    "refusal_attempts": {
+      "default": 3,
+      "kind": "int",
+      "lo": 1,
+      "hi": 10,
+      "enum": [],
+      "values": [],
+      "frozen": true,
+      "description": "consecutive no-op emissions before the run stops",
       "required": false
     },
     "research_attempts": {

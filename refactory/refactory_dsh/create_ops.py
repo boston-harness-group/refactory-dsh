@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any
 
 from refactory_dsh import registry
+from refactory_dsh.run import BuildLoopStop
 from refactory_dsh.paths import project_root, project_for_nodes
 from refactory_dsh.nn import Package, PackageError, Verdict, validate_state
 from refactory_dsh.repo_change import refuse_truncated, EMISSION_PATH
@@ -786,7 +787,10 @@ def materialise(ctx: Any) -> dict[str, Any]:
     try:
         files = parse_files(answer)
     except ValueError as exc:
-        return {"emission_refused": str(exc)}
+        if isinstance(exc, BuildLoopStop):
+            raise  # not a refusal — re-raise the stop
+        from refactory_dsh.repo_change import _count_refusal
+        return _count_refusal(ctx, exc)
     if not files:
         raise ValueError(
             "the answer contained no '===FILE: <name>===' blocks, so there is "
@@ -837,7 +841,7 @@ def materialise(ctx: Any) -> dict[str, Any]:
         registry.install_workspace(project_for_nodes())
     ctx.write_json(f"{STAGING}/manifest.json", {"package": name, "files": sorted(written)})
     cleared = {"emission_refused": ""} if ctx.facts.get("emission_refused") else {}
-    return {"package_path": str(root), "files": sorted(written), **cleared}
+    return {"package_path": str(root), "files": sorted(written), **cleared, "consecutive_refusals": 0}
 
 
 def parse_files(answer: str) -> dict[str, str]:
@@ -1705,16 +1709,16 @@ def repair(ctx: Any, findings: list[str], *, kind: str = "check",
                         granted = True
                 if not granted:
                     if cap > kind_limit and kind_used >= cap:
-                        raise ValueError(
+                        raise BuildLoopStop(
                             f"check attempt cap ({cap}) reached after {kind_used} "
                             f"check attempt(s): {feedback}"
                         )
-                    raise ValueError(
+                    raise BuildLoopStop(
                         f"check attempts exhausted after {kind_used} check failure(s): {feedback}"
                     )
             else:
                 # Early stop: do not grant convergence.
-                raise ValueError(
+                raise BuildLoopStop(
                     f"check attempts exhausted after {kind_used} check failure(s): {feedback}"
                 )
     else:
@@ -1722,7 +1726,7 @@ def repair(ctx: Any, findings: list[str], *, kind: str = "check",
         ctx.set_fact("review_attempts_used", kind_used)
         kind_limit = int(ctx.knob("review_attempts", ctx.knob("check_attempts", ctx.knob("attempts", 3))))
         if kind_used >= kind_limit:
-            raise ValueError(
+            raise BuildLoopStop(
                 f"review reloop limit reached after {kind_used} review cycle(s): {feedback}"
             )
 
@@ -1730,7 +1734,7 @@ def repair(ctx: Any, findings: list[str], *, kind: str = "check",
     # R6: apply the granted extra attempt to the overall cap too.
     extras_granted = int(ctx.facts.get("convergence_extras_used", 0))
     if used >= overall_limit + extras_granted:
-        raise ValueError(f"authoring unresolved after {used} attempt(s): {feedback}")
+        raise BuildLoopStop(f"authoring unresolved after {used} attempt(s): {feedback}")
     return Verdict("reloop", feedback)
 
 

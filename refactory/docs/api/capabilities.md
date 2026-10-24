@@ -6824,7 +6824,9 @@ Build a reusable mode package from a brief, name and task/single-shot inputs. Ca
       "call": "refactory_dsh.create_ops:materialise",
       "id": "materialise",
       "kind": "op",
-      "knobs": [],
+      "knobs": [
+        "refusal_attempts"
+      ],
       "notes": "write the staged package to disk",
       "role": "ceo"
     },
@@ -7048,6 +7050,18 @@ Build a reusable mode package from a brief, name and task/single-shot inputs. Ca
       "value": "",
       "values": []
     },
+    "refusal_attempts": {
+      "default": 3,
+      "description": "consecutive no-op emissions before the run stops",
+      "frozen": true,
+      "kind": "int",
+      "range": [
+        1,
+        10
+      ],
+      "value": 3,
+      "values": []
+    },
     "requires_input": {
       "default": "",
       "description": "the inputs the produced mode must accept, comma-separated (e.g. `package` or `source_tree`); each must be received as a knob named after it or read from the run directory",
@@ -7165,7 +7179,7 @@ Build a reusable mode package from a brief, name and task/single-shot inputs. Ca
       "panel": "Mode picker; Run once executes enabled modes including authoring; Optimize requires a scored mode. Use chat for stepwise gates."
     },
     "purpose": "Build a reusable mode package from a brief, name and task/single-shot inputs. Canonical smoke runs before separate QA and Overwatch; repair shares the attempt bound and completion needs current validation and intent evidence.",
-    "reviewed_schema": "1587660e5d935b6a88f82dcead1bf56d6c8d344260ea7c74d89bf80a9d8c399d"
+    "reviewed_schema": "e7440218ffcc73460b7528261218dab696ae62da17cf57bd81ac472ec6dd1b90"
   }
 }
 ```
@@ -7310,7 +7324,9 @@ Build a small reusable package with a strategist, coder and focused QA. Canonica
       "call": "refactory_dsh.create_ops:materialise",
       "id": "materialise",
       "kind": "op",
-      "knobs": [],
+      "knobs": [
+        "refusal_attempts"
+      ],
       "notes": "write the staged package to disk",
       "role": "ceo"
     },
@@ -7475,6 +7491,18 @@ Build a small reusable package with a strategist, coder and focused QA. Canonica
       "value": "",
       "values": []
     },
+    "refusal_attempts": {
+      "default": 3,
+      "description": "consecutive no-op emissions before the run stops",
+      "frozen": true,
+      "kind": "int",
+      "range": [
+        1,
+        10
+      ],
+      "value": 3,
+      "values": []
+    },
     "repair_attempts": {
       "default": 1,
       "description": "total repairs across admission, runtime validation and focused QA",
@@ -7580,7 +7608,7 @@ Build a small reusable package with a strategist, coder and focused QA. Canonica
       "panel": "Mode picker; Run once executes enabled modes including authoring; Optimize requires a scored mode. Use chat for stepwise gates."
     },
     "purpose": "Build a small reusable package with a strategist, coder and focused QA. Canonical smoke precedes focused QA; structural, runtime and review failures share repair_attempts. Supply a brief, name and task/single-shot inputs.",
-    "reviewed_schema": "ce7035565ccddc4d6810fa435397806f50bbb953aeadcaeed70e17ba7653a71c"
+    "reviewed_schema": "7a8132c2ed3860a3c55463d3f12917408795be197977e5f7840af503e39e6f9a"
   }
 }
 ```
@@ -8073,7 +8101,9 @@ Build a software artifact from a brief, name and acceptance command, as commits 
       "call": "refactory_dsh.repo_change:materialise",
       "id": "materialise",
       "kind": "op",
-      "knobs": [],
+      "knobs": [
+        "refusal_attempts"
+      ],
       "notes": "commit the emitted files on the run's branch, or write the artifact directory",
       "role": "ceo"
     },
@@ -8390,6 +8420,18 @@ Build a software artifact from a brief, name and acceptance command, as commits 
       "value": "",
       "values": []
     },
+    "refusal_attempts": {
+      "default": 3,
+      "description": "consecutive no-op emissions before the run stops",
+      "frozen": true,
+      "kind": "int",
+      "range": [
+        1,
+        10
+      ],
+      "value": 3,
+      "values": []
+    },
     "repo_owner": {
       "default": "",
       "description": "the GitHub account or organisation a new project's repository is created under (default: the account gh is logged in to)",
@@ -8529,7 +8571,7 @@ Build a software artifact from a brief, name and acceptance command, as commits 
       "panel": "Mode picker; Run once executes enabled modes including authoring; Optimize requires a scored mode. Use chat for stepwise gates."
     },
     "purpose": "Build a software artifact from a brief, name and acceptance command, as commits on the run's own branch in a git worktree: of the repository `target` names, or of a new project when it names none. A design review checks the design for open choices and unchecked claims before the approval gate (`design_review_attempts`); a scoped change (a refine, or a brief naming files) skips the perspectives step and the review agent, and its design is checked automatically. The command runs in that worktree beside the separate QA reviews (on the commit both see), and Overwatch audits afterwards; final current validation and intent evidence are required. Only a core defect (an unmet ask, criterion or correction, or a regression) sends the build back; other review findings are listed on the pull request as follow-ups. Once they pass, the branch is delivered as a pull request (into the branch its base came from, or the default branch), which the approval gate's question names first (`pr=0` keeps it local, with its pull request text in pull-request.md and finishing commands in delivery.json; `refine` updates an open one).",
-    "reviewed_schema": "840c35f3257f22e40d99d8741d29a271c70eac528b0877a3e05b78d64ba597fc"
+    "reviewed_schema": "d66f8e3d2fe4aa8fe50f82b0a8cd5e7e27babf22acda2dcf75a69e092174d785"
   }
 }
 ```
@@ -8713,7 +8755,9 @@ Build a small artifact with one sequential strategist, coder and QA agent, as co
       "call": "refactory_dsh.fast_ops:materialise_artifact",
       "id": "materialise",
       "kind": "op",
-      "knobs": [],
+      "knobs": [
+        "refusal_attempts"
+      ],
       "notes": "commit the emitted files on the run's branch, or write the artifact directory: a copy of source_project, when there is one",
       "role": "ceo"
     },
@@ -8858,6 +8902,18 @@ Build a small artifact with one sequential strategist, coder and QA agent, as co
       "value": "",
       "values": []
     },
+    "refusal_attempts": {
+      "default": 3,
+      "description": "consecutive no-op emissions before the run stops",
+      "frozen": true,
+      "kind": "int",
+      "range": [
+        1,
+        10
+      ],
+      "value": 3,
+      "values": []
+    },
     "repair_attempts": {
       "default": 1,
       "description": "total repairs, for an emission materialise could not apply, a failed check or focused QA",
@@ -8948,7 +9004,7 @@ Build a small artifact with one sequential strategist, coder and QA agent, as co
       "panel": "Mode picker; Run once executes enabled modes including authoring; Optimize requires a scored mode. Use chat for stepwise gates."
     },
     "purpose": "Build a small artifact with one sequential strategist, coder and QA agent, as commits on the run's own branch in a git worktree: of the repository `target` names, or of a new project when it names none (`worktree=0` writes .factory/artifacts instead; `source_project` copies a directory there). The check runs in that worktree before focused QA. It has no approval gate, so it opens no pull request: the branch is left for you to push.",
-    "reviewed_schema": "43623aca23c80103a3e66f091330621f1d5c1450a59c4a6618b1da96c4814ce0"
+    "reviewed_schema": "142c9432f5b14ce7c572e08451b06b8495cd4ab025861483b51e86c6898f4be2"
   }
 }
 ```
@@ -9234,7 +9290,9 @@ Revise an existing mode package and validate the revision before separate QA and
       "call": "refactory_dsh.create_ops:materialise",
       "id": "materialise",
       "kind": "op",
-      "knobs": [],
+      "knobs": [
+        "refusal_attempts"
+      ],
       "notes": "write the staged package to disk",
       "role": "ceo"
     },
@@ -9458,6 +9516,18 @@ Revise an existing mode package and validate the revision before separate QA and
       "value": "",
       "values": []
     },
+    "refusal_attempts": {
+      "default": 3,
+      "description": "consecutive no-op emissions before the run stops",
+      "frozen": true,
+      "kind": "int",
+      "range": [
+        1,
+        10
+      ],
+      "value": 3,
+      "values": []
+    },
     "requires_input": {
       "default": "",
       "description": "the inputs the produced mode must accept, comma-separated (e.g. `package` or `source_tree`); each must be received as a knob named after it or read from the run directory",
@@ -9575,7 +9645,7 @@ Revise an existing mode package and validate the revision before separate QA and
       "panel": "Mode picker; Run once executes enabled modes including authoring; Optimize requires a scored mode. Use chat for stepwise gates."
     },
     "purpose": "Revise an existing mode package and validate the revision before separate QA and Overwatch. Supply revision_of, name and brief. allow_regression=true skips original execution and numerical comparison, while revised execution and intent evidence remain mandatory.",
-    "reviewed_schema": "0f4c3bdd44d5afb751113e9bb6f516edad97b220dd9e2ff285c00fc3022538f9"
+    "reviewed_schema": "24416e7927983dc39f455e7b661c7816e4285b23accc507855bc271ce996c916"
   }
 }
 ```
@@ -9715,7 +9785,9 @@ Revise a small mode package with a coder and focused QA after canonical validati
       "call": "refactory_dsh.create_ops:materialise",
       "id": "materialise",
       "kind": "op",
-      "knobs": [],
+      "knobs": [
+        "refusal_attempts"
+      ],
       "notes": "write the staged package to disk",
       "role": "ceo"
     },
@@ -9872,6 +9944,18 @@ Revise a small mode package with a coder and focused QA after canonical validati
       "value": "",
       "values": []
     },
+    "refusal_attempts": {
+      "default": 3,
+      "description": "consecutive no-op emissions before the run stops",
+      "frozen": true,
+      "kind": "int",
+      "range": [
+        1,
+        10
+      ],
+      "value": 3,
+      "values": []
+    },
     "repair_attempts": {
       "default": 1,
       "description": "total repairs across admission, runtime validation and focused QA",
@@ -9977,7 +10061,7 @@ Revise a small mode package with a coder and focused QA after canonical validati
       "panel": "Mode picker; Run once executes enabled modes including authoring; Optimize requires a scored mode. Use chat for stepwise gates."
     },
     "purpose": "Revise a small mode package with a coder and focused QA after canonical validation. Supply revision_of, name and brief. allow_regression=true skips original execution/comparison but still requires revised validation and intent evidence.",
-    "reviewed_schema": "acc7216ae2c123f0618249e5adfdb09778c49610d0441e75ca06783f6602272d"
+    "reviewed_schema": "d34f4d7bb729b3021190556694def10bd858c73a2da0813fe7a9c1ff683e5368"
   }
 }
 ```

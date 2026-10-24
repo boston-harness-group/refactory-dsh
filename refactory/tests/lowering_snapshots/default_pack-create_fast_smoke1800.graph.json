@@ -308,6 +308,7 @@
   "start_node": "prepare",
   "terminal": true,
   "knob_values": {
+    "refusal_attempts": 3.0,
     "task_ref": "",
     "single_shot": 0.0,
     "smoke_timeout_s": 1800.0,
@@ -324,6 +325,17 @@
     "check_timeout_s": 60.0
   },
   "knob_specs": {
+    "refusal_attempts": {
+      "default": 3,
+      "kind": "int",
+      "lo": 1,
+      "hi": 10,
+      "enum": [],
+      "values": [],
+      "frozen": true,
+      "description": "consecutive no-op emissions before the run stops",
+      "required": false
+    },
     "task_ref": {
       "default": "",
       "kind": "str",

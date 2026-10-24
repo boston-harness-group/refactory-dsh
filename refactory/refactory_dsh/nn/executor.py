@@ -861,6 +861,9 @@ class Executor:
         except OpTimeoutError:
             raise
         except Exception:
+            from refactory_dsh.run import BuildLoopStop
+            if isinstance(sys.exc_info()[1], BuildLoopStop):
+                raise
             # Restore state to pre-attempt snapshot.
             self.ctx.facts = facts_snapshot
             self.ctx._produced = set()  # noqa: SLF001

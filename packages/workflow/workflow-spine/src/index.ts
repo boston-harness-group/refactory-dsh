@@ -214,6 +214,28 @@ export const Config = z.object({
 const STATUS_DETAIL = 2_000
 
 /**
+ * Extract the meaningful failure detail from a node command's stderr.
+ *
+ * When the runner's `--- refactory failure ---` marker is present, take
+ * only the text after the last occurrence (the structured block
+ * `format_failure_detail` printed).  Otherwise fall back to head + tail,
+ * never tail-only (dm-203).
+ */
+function failureDetailOf(stderr: string): string {
+  const marker = '--- refactory failure ---'
+  const markerIndex = stderr.lastIndexOf(marker)
+  if (markerIndex !== -1) {
+    const afterMarker = stderr.slice(markerIndex + marker.length).trimStart()
+    return afterMarker.slice(0, STATUS_DETAIL)
+  }
+  // Fallback for non-refactory commands: head + tail, never tail-only.
+  if (stderr.length <= STATUS_DETAIL) return stderr
+  const head = stderr.slice(0, 500)
+  const tail = stderr.slice(-(STATUS_DETAIL - 500 - 5))
+  return `${head}\n…\n${tail}`
+}
+
+/**
  * What asking a person at a user gate came to: a verdict with any feedback; text
  * that is no answer, which leaves the gate due for the CEO to reply to; or nothing,
  * when the run was halted, paused or changed while the question was open.
@@ -1038,10 +1060,13 @@ export function apply(ctx: Context, config: Config): void {
    * run's own directory when a session opened the mode at run time.
    * @param status - `done`, `ready`, `failed`, or `refused`.
    * @param detail - the error, for a failure or refusal.
-   * @param failedNode - the node that failed, for a node command failure that
-   * the graph may retry. Writes `last_failure` in the status record; the
-   * run-level status stays non-terminal so the retry is not mistaken for a
-   * finished, failed run.
+   * @param failedNode - the node that failed. Writes `last_failure` in the
+   * status record. For most node command failures (nonzero exit other than 3)
+   * the run-level status stays non-terminal (`ready`) so the retry is not
+   * mistaken for a finished, failed run (dm-95). For a build-loop limit stop
+   * (exit code 3 with the `--- refactory failure ---` marker), the run-level
+   * status is `failed` — `last_failure` accompanies the terminal status so
+   * readers see which node stopped the run.
    */
   function recordStatus(spine: Spine, workdir: string | undefined, status: string, detail?: string,
       failedNode?: { node: string; error: string }): void {
@@ -1594,11 +1619,15 @@ export function apply(ctx: Context, config: Config): void {
       // back to re-run the node to find out, so the reason is recorded with it.
       // dm-95: write status ready (not failed) with last_failure — a node failure
       // the graph may retry is not a finished, failed run. The caller (CEO) still
-      // sees status: 'failed' so it knows what happened.
+      // sees status: 'failed' so it knows what happened. Exit code 3 with the
+      // refactory failure marker is a build-loop limit stop (dm-202): that records
+      // 'failed' (terminal) while other nonzero codes remain 'ready' (retryable).
       const reason = failure.stderr.trim()
-      const failDetail = reason === '' ? failure.error : `${failure.error}: ${reason.slice(-STATUS_DETAIL)}`
+      const failDetail = reason === '' ? failure.error : `${failure.error}: ${failureDetailOf(reason)}`
+      const isLimitStop = failure.exitCode === 3 && reason.includes('--- refactory failure ---')
       recordStatus(spine, workdir,
-        spine.isHalted() ? 'halted' : spine.isPaused() ? 'paused' : 'ready',
+        isLimitStop ? 'failed'
+          : spine.isHalted() ? 'halted' : spine.isPaused() ? 'paused' : 'ready',
         undefined,
         { node: failure.nodeId, error: failDetail })
       return json({
@@ -2290,6 +2319,10 @@ export function apply(ctx: Context, config: Config): void {
         spine.pauseBefore(args.node, args.action === 'pause')
         recordStatus(spine, workdir, spine.isHalted() ? 'halted' : spine.isPaused() ? 'paused' : spine.next().status)
       } else if (args.action === 'skip') {
+        if (recordedStatus(workdir) === 'failed') {
+          throw new Error('run has failed; a CEO redo cannot spend more attempts. Use '
+            + '`refactory graph-control rerun --acknowledge-failure` to have a person spend more attempts.')
+        }
         const nodes = spine.planSkip(args.node)
         if (agentCommand !== '' && workdir !== undefined) {
           runtimeBridge(agentCommand, workdir, commandEnv, {

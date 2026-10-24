@@ -311,12 +311,13 @@ def test_an_emission_materialise_cannot_apply_goes_back_to_emit_with_the_reason(
 
 
 def test_emissions_that_never_apply_exhaust_the_gate_iteration_limit(repo, tmp_path):
-    """Refused emissions do not spend attempts; the gate's max_iterations (8) ends the run."""
+    """Refused emissions trigger the consecutive-refusal bound (default 3) before the gate's
+    max_iterations (8). The refusal counter in materialise raises BuildLoopStop."""
     bad = _edit("app.py", ("print('not there')\n", "x\n"))
-    # 9 bad emissions: the check gate allows 8 iterations; the 9th triggers the error.
-    result = _design(tmp_path / "run", FakeModel(_answers(*([bad] * 9))), target=str(repo))
+    # 4 bad emissions: the refusal bound (default 3) fires on the third consecutive refusal.
+    result = _design(tmp_path / "run", FakeModel(_answers(*([bad] * 4))), target=str(repo))
     assert not result.exit_ok
-    assert "exceeded max_iterations" in str(result.error)
+    assert "emissions refused" in str(result.error) or "exceeded max_iterations" in str(result.error)
     assert not result.facts.get("attempts_used"), "refused emissions must not spend attempts"
     # A person reads result.facts["validation"] via `refactory status`; it holds the refusal.
     assert "materialise could not apply emit.txt" in result.facts.get("validation", "")

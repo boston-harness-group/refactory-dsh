@@ -338,6 +338,7 @@
     "name": "",
     "brief": "",
     "check": "",
+    "refusal_attempts": 3.0,
     "target": "",
     "base": "",
     "worktree": 1.0,
@@ -401,6 +402,17 @@
       "values": [],
       "frozen": false,
       "description": "the command that decides whether the artifact works",
+      "required": false
+    },
+    "refusal_attempts": {
+      "default": 3,
+      "kind": "int",
+      "lo": 1,
+      "hi": 10,
+      "enum": [],
+      "values": [],
+      "frozen": true,
+      "description": "consecutive no-op emissions before the run stops",
       "required": false
     },
     "target": {

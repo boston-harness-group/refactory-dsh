@@ -98,6 +98,10 @@ class DesignMode(Mode):
             "check": Knob("", "str", description="the command that decides whether the artifact works"),
             # Where the run works (#351), as any mode that changes a repository declares it
             # (`repo_change`), and how its work is delivered once its reviews pass (#350).
+            "refusal_attempts": Knob(
+                3, "int", lo=1, hi=10, frozen=True,
+                description="consecutive no-op emissions before the run stops",
+            ),
             **repo_change.knobs(),
             **delivery.knobs(),
         }
@@ -478,7 +482,8 @@ class DesignMode(Mode):
         graph.add(repo_change.materialise_node(
             writes=("changes.diff", "changed-functions.json"),
             produces=("artifact", "files", "commit", "change", "emission_refused",
-                      "changed_functions"),
+                      "changed_functions", "consecutive_refusals"),
+            knobs=("refusal_attempts",),
         ))
         # ── the check, beside the reviews ──
         # prepare_check settles the commit the check and the reviewers both see; the

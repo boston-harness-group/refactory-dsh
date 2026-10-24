@@ -13,6 +13,16 @@ gate. A gate that says why (a :class:`~refactory_dsh.nn.Verdict` with a reason) 
 the reason printed on the lines before it, and the spine hands that to the node a
 reloop goes back to and to the CEO. So a gate logs to stderr: anything else it
 printed to stdout would be read as part of its reason.
+
+Exit codes
+----------
+- 0: success.
+- 1: general node failure (any exception except ``BuildLoopStop``).
+- 2: usage error.
+- 3: build-loop limit stop (``BuildLoopStop``).  The spine maps this to
+  status ``failed`` when the ``--- refactory failure ---`` marker is present
+  in stderr.  ``format_failure_detail`` prints reason-first text after the
+  marker so the spine keeps the reason, not the tail.
 """
 
 from __future__ import annotations
@@ -57,6 +67,68 @@ def _clipped(reason: str) -> str:
     marker = f"\n… (clipped from {len(reason)} characters) …\n"
     half = (REASON_LIMIT - len(marker)) // 2
     return reason[:half] + marker + reason[-half:]
+
+
+#: The marker ``refactory_dsh.run`` prints before the failure detail so the spine
+#: can locate the structured block even when earlier stderr lines push it down.
+FAILURE_MARKER = "--- refactory failure ---"
+
+
+def format_failure_detail(exc: Exception, limit: int = 2000) -> str:
+    """Build the failure text the spine keeps, reason first.
+
+    Layout within *limit* characters total:
+
+    - ``<Type>: <first line of message>``, clipped to 500 chars (the reason);
+    - failing test ids from the message, each prefixed ``FAILED ``;
+    - a clipped tail of the rest of the message after its first line.
+
+    When ``<Type>: <message>`` fits within the limit, return it whole.
+    """
+    msg = str(exc)
+    type_name = type(exc).__name__
+    full = f"{type_name}: {msg}"
+    if len(full) <= limit:
+        return full
+    first_line = msg.split("\n", 1)[0]
+    reason = f"{type_name}: {first_line}"
+    if len(reason) > 500:
+        reason = reason[:497] + "..."
+
+    from refactory_dsh.base_check import parse_test_failures
+
+    test_ids = parse_test_failures(msg)
+    test_block = "\n".join(f"FAILED {tid}" for tid in sorted(test_ids)) if test_ids else ""
+
+    # Build rest: message after the first line
+    rest = msg.split("\n", 1)[1] if "\n" in msg else ""
+
+    used = len(reason)
+    if test_block:
+        used += 1 + len(test_block)  # newline + block
+    remaining = limit - used - 1  # 1 for joining newline
+    if remaining > 0 and rest:
+        tail = "..." + rest[-(remaining - 3):] if len(rest) > remaining else rest
+    else:
+        tail = ""
+
+    parts = [reason]
+    if test_block:
+        parts.append(test_block)
+    if tail:
+        parts.append(tail)
+    result = "\n".join(parts)
+    return result[:limit]
+
+
+class BuildLoopStop(ValueError):
+    """A build-loop limit reached; no more attempts.
+
+    Raised by the build loop's limits (check exhausted, review reloop,
+    authoring unresolved, consecutive refusals) and caught by ``main()``
+    which exits with code 3.  The spine maps exit code 3 (with the
+    ``--- refactory failure ---`` marker) to status ``failed``.
+    """
 
 
 class RunnerError(RuntimeError):
@@ -288,11 +360,11 @@ def run_node(
             raise
         from refactory_dsh.budgets import BudgetExhausted
 
-        # BudgetExhausted: write facts and re-raise without retry.
+        # BudgetExhausted / BuildLoopStop: write facts and re-raise without retry.
         # (re-check the exception type since we're in a broad except)
         import sys as _sys
         exc_info = _sys.exc_info()
-        if isinstance(exc_info[1], BudgetExhausted):
+        if isinstance(exc_info[1], (BudgetExhausted, BuildLoopStop)):
             _write_facts()
             raise
         # Restore facts and retry once.
@@ -337,8 +409,14 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     try:
         produced = run_node(argv[0], node_id=node_id or None)
+    except BuildLoopStop as exc:
+        print(FAILURE_MARKER, file=sys.stderr)
+        print(format_failure_detail(exc), file=sys.stderr)
+        return 3
     except Exception as exc:  # a failing node must fail loudly, and not be a traceback
         print(f"{type(exc).__name__}: {exc}", file=sys.stderr)
+        print(FAILURE_MARKER, file=sys.stderr)
+        print(format_failure_detail(exc), file=sys.stderr)
         return 1
     # A gate's output is its reason, then its verdict: the spine routes on the
     # last non-empty line and reports the lines before it as why.

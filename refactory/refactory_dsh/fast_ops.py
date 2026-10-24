@@ -9,6 +9,7 @@ import re
 from typing import Any
 
 from refactory_dsh import create_ops, design_ops, repo_change, sandbox, unbuilt_check, worktree
+from refactory_dsh.run import BuildLoopStop
 from refactory_dsh import authoring_evidence as evidence
 from refactory_dsh.nn import Verdict
 
@@ -175,7 +176,7 @@ def _repair(ctx: Any, findings: list[str], *, kind: str = "check",
                         return Verdict("reloop", feedback)
                 if cap > limit and kind_used >= cap:
                     ctx.write_json("fast-report.json", _report(ctx, "unresolved", findings))
-                    raise ValueError(
+                    raise BuildLoopStop(
                         f"check attempt cap ({cap}) reached after {kind_used} "
                         f"repair(s) (check failure): {feedback}"
                     )
@@ -183,14 +184,14 @@ def _repair(ctx: Any, findings: list[str], *, kind: str = "check",
                 # Early stop: do not grant convergence.
                 kind_used = int(ctx.facts.get("check_repairs_used", 0))
                 ctx.write_json("fast-report.json", _report(ctx, "unresolved", findings))
-                raise ValueError(
+                raise BuildLoopStop(
                     f"check attempts exhausted after {kind_used} "
                     f"repair(s) (check failure): {feedback}"
                 )
 
         ctx.write_json("fast-report.json", _report(ctx, "unresolved", findings))
         label = "check" if kind == "check" else "review"
-        raise ValueError(
+        raise BuildLoopStop(
             f"focused QA/admission unresolved after {used} repair(s) "
             f"({label} failure): {feedback}"
         )

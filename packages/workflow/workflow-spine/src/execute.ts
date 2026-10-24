@@ -307,6 +307,10 @@ export async function runDataCommand(
  * A nonzero exit, a timeout, an abort, or (for a gate) empty stdout fails the
  * node rather than advancing the cursor: a graph step that did not happen must
  * not look like one that did.
+ *
+ * Exit code 3 with the `--- refactory failure ---` marker in stderr is a
+ * build-loop limit stop: the spine records `failed` (terminal), not `ready`
+ * (retryable).  Every other nonzero exit stays `ready` (dm-95).
  * @param shell - the shell executor that runs node commands.
  * @param node - the node view whose command to run.
  * @param config - work directory, environment, and timeout for the command.

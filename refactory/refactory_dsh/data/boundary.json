@@ -107,7 +107,11 @@
     "refactory_dsh.changed_functions",
     "refactory_dsh.patch_scope"
   ],
-  "allowed_leaks": {},
+  "allowed_leaks": {
+    "refactory_dsh.run": [
+      {"imports": "refactory_dsh.base_check", "reason": "format_failure_detail uses parse_test_failures to extract failing test ids for the spine's status record; moves to product after the split"}
+    ]
+  },
   "references": [
     {"source": "packages/workflow/workflow-spine/src/index.ts", "target": "refactory_dsh.console", "kind": "string-ref", "reason": "error message mentioning console open command — documentation only", "until": "the split"},
     {"source": "refactory/refactory_dsh/invocations.py", "target": "refactory_dsh.delivery", "kind": "string-ref", "reason": "DELIVER_ENTRY_POINTS names the product callable as a string", "until": "the split — the string becomes a cross-repo entry point identifier"},
